@@ -98,7 +98,6 @@ class BKing(King):
 
 
 class ChessBoard(dict):
-    # Przerobić na listę
     def __init__(self, funny=False):
         self.funny = funny
         for j in range(1, 9):
