@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 import sys
+import string
 
-alpha = ("A", "B", "C", "D", "E", "F", "G", "H")
-
+alpha = tuple(string.ascii_uppercase[:8])
 
 # TODO
-# -colors
 # -diagonal movement
 # -functionality
 
@@ -18,44 +17,40 @@ class DPawn():
 
 
 class Pawn(DPawn):
-    tag = "P"
+    tag = "p"
     color_white = True
     movement = ((0, 1))
     kill = ((-1, 1), (1, 1))
 
 
 class BPawn(Pawn):
-    tag = "p"
     color_white = False
 
 
 class Rook(DPawn):
-    tag = "R"
+    tag = "r"
     color_white = True
     movement = ((0, "*"), ("*", 0))
 
 
 class BRook(Rook):
-    tag = "r"
     color_white = False
 
 
-class Horse(DPawn):
-    tag = "H"
+class Knight(DPawn):
+    tag = "k"
     color_white = True
     movement = ((1, 3), (1, -3), (-1, -3), (-1, 3))
 
 
-class BHorse(Horse):
-    tag = "h"
+class BKnight(Knight):
     color_white = False
 
 
 class Bishop(DPawn):
-    tag = "B"
+    tag = "b"
     color_white = True
     movement = []
-
     def __init__(self):
         for i in range(0, 8):
             self.movement.append((i, i))
@@ -65,15 +60,13 @@ class Bishop(DPawn):
 
 
 class BBishop(Bishop):
-    tag = "b"
     color_white = False
 
 
 class Queen(DPawn):
-    tag = "Q"
+    tag = "q"
     color_white = True
     movement = [(0, "*"), ("*", 0)]
-
     def __init__(self):
         for i in range(0, 8):
             self.movement.append((i, i))
@@ -83,7 +76,6 @@ class Queen(DPawn):
 
 
 class BQueen(Queen):
-    tag = "q"
     color_white = False
 
 
@@ -94,12 +86,10 @@ class King(DPawn):
 
 
 class BKing(King):
-    tag = "k"
-
+    color_white = False
 
 class ChessBoard(dict):
-    def __init__(self, funny=False):
-        self.funny = funny
+    def __init__(self):
         for j in range(1, 9):
             for ind, i in enumerate(alpha):
                 if j == 2:
@@ -111,9 +101,9 @@ class ChessBoard(dict):
                 elif i+str(j) in ["A8", "H8"]:
                     self[i+str(j)] = BRook()
                 elif i+str(j) in ["B1", "G1"]:
-                    self[i+str(j)] = Horse()
+                    self[i+str(j)] = Knight()
                 elif i+str(j) in ["B8", "G8"]:
-                    self[i+str(j)] = BHorse()
+                    self[i+str(j)] = BKnight()
                 elif i+str(j) in ["C1", "F1"]:
                     self[i+str(j)] = Bishop()
                 elif i+str(j) in ["C8", "F8"]:
@@ -129,24 +119,37 @@ class ChessBoard(dict):
                 else:
                     self[i+str(j)] = DPawn()
 
-    def print(self):
+    def print(self, reverse=False):
         keys = list(self.keys())
-        for i in range(8):
-            yield "-"*34+"\n"+str(int(keys[i*8][1]))
-
-            for j in range(8):
-                yield f"| {self[keys[j+i*8]].tag}".ljust(4)
-            yield "|\n"
-        yield "-"*34+"\n "
-        for i in range(8):
+        yield " "
+        rng = [7, -1, -1]
+        rngr = [0, 8, 1]
+        if reverse:
+            rng, rngr = rngr, rng
+        for i in range(*rngr):
             yield f"| {keys[i][0]}".ljust(4)
-        yield "|\n\n"
-        yield "Black are lowercase\n"
+        yield "|\n"+"-+"+"---+"*8
+        for i in range(*rng):
+            yield "\n"+str(int(keys[i*8][1]))
+            for j in range(*rngr):
+                if (i+j)%2:
+                    brgb = "255;255;255"
+                else:
+                    brgb = "0;0;0"
+                piece = self[keys[j+i*8]]
+                if piece.color_white:
+                    frgb = "0;0;255"
+                else:
+                    frgb = "255;0;0"
+                yield "".join((f"|\033[48;2;{brgb}m",
+                    f"\033[38;2;{frgb}m {self[keys[j+i*8]].tag} ","\033[m"))
+            yield "|\n"+"-+"+"---+"*8
+            yield "\033[|"
+        yield "\n"
 
 
 class Chess(dict):
-    def __init__(self, funny=False):
-        self.funny = funny
+    def __init__(self):
         self.fields = []
         for i in alpha:
             for j in range(1, 9):
@@ -154,7 +157,7 @@ class Chess(dict):
         self.reset()
 
     def reset(self):
-        self.board = ChessBoard(self.funny)
+        self.board = ChessBoard()
 
     def check(self, field_from, field_to):
         pawn = self.board[field_from]
@@ -193,7 +196,11 @@ class Chess(dict):
         self.whites = True
         while interactive or (not interactive and inp):
             try:
-                for i in self.board.print():
+                if self.whites:
+                    reverse = False
+                else:
+                    reverse = True
+                for i in self.board.print(reverse):
                     if interactive:
                         print(i, end="")
                     else:
