@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import sys
 import string
 
@@ -12,26 +13,32 @@ alpha = tuple(string.ascii_uppercase[:8])
 class DPawn():
     tag = " "
     color_white = None
-    movement = None
-    kill = None
-
 
 class Pawn(DPawn):
     tag = "p"
     color_white = True
-    movement = ((0, 1))
+    movement = ((0, 1),)
     kill = ((-1, 1), (1, 1))
+    first = True
 
 
 class BPawn(Pawn):
     color_white = False
+    movement = ((0, -1),)
+    kill = ((-1, -1), (1, -1))
 
 
 class Rook(DPawn):
     tag = "r"
     color_white = True
-    movement = ((0, "*"), ("*", 0))
-
+    movement = []
+    def __init__(self):
+        for i in range(1,8):
+            self.movement.append((0,i))
+            self.movement.append((0,-i))
+            self.movement.append((i,0))
+            self.movement.append((-i,0))
+        self.movement = tuple(self.movement)
 
 class BRook(Rook):
     color_white = False
@@ -40,7 +47,8 @@ class BRook(Rook):
 class Knight(DPawn):
     tag = "k"
     color_white = True
-    movement = ((1, 3), (1, -3), (-1, -3), (-1, 3))
+    movement = ((1, 2), (1, -2), (-1, -2), (-1, 2),
+            (2, 1), (2, -1), (-2, -1), (-2, 1))
 
 
 class BKnight(Knight):
@@ -52,11 +60,12 @@ class Bishop(DPawn):
     color_white = True
     movement = []
     def __init__(self):
-        for i in range(0, 8):
+        for i in range(1, 8):
             self.movement.append((i, i))
             self.movement.append((i, -i))
             self.movement.append((-i, -i))
             self.movement.append((-i, i))
+        self.movement = tuple(self.movement)
 
 
 class BBishop(Bishop):
@@ -66,14 +75,18 @@ class BBishop(Bishop):
 class Queen(DPawn):
     tag = "q"
     color_white = True
-    movement = [(0, "*"), ("*", 0)]
+    movement = []
     def __init__(self):
-        for i in range(0, 8):
+        for i in range(1,8):
+            self.movement.append((0,i))
+            self.movement.append((0,-i))
+            self.movement.append((i,0))
+            self.movement.append((-i,0))
             self.movement.append((i, i))
             self.movement.append((i, -i))
             self.movement.append((-i, -i))
             self.movement.append((-i, i))
-
+        self.movement = tuple(self.movement)
 
 class BQueen(Queen):
     color_white = False
@@ -148,30 +161,46 @@ class ChessBoard(dict):
         yield "\n"
 
 
-class Chess(dict):
+class Chess():
     def __init__(self):
-        self.fields = []
-        for i in alpha:
-            for j in range(1, 9):
-                self.fields.append(i+str(j))
         self.reset()
+        self.fields = tuple(self.board.keys())
 
     def reset(self):
         self.board = ChessBoard()
 
     def check(self, field_from, field_to):
         pawn = self.board[field_from]
+        if self.whites != pawn.color_white or type(pawn) is DPawn:
+            return "Invalid move\n"
         movement = set()
         for i in pawn.movement:
             movement.add(i)
-        if isinstance(pawn, Pawn):
-            movement.add(pawn.kill)
-        available = []
-        if (0, "*") in movement:
-            ind = alpha.index(field_from[1]-1)
-            for i in range(ind, 1, -1):
-                pass
-        if not self.whites != pawn.color_white:
+        xfrom = alpha.index(field_from[0])
+        xto = alpha.index(field_to[0])
+        vector = (xto-xfrom, int(field_to[1])-int(field_from[1]))
+        try:
+            if isinstance(pawn, Pawn):
+                if pawn.first:
+                    if pawn.color_white:
+                        movement.add((0,2))
+                    else:
+                        movement.add((0,-2))
+            if vector in movement:
+                self.board[field_to] = pawn
+                self.board[field_from] = DPawn()
+                if isinstance(pawn, Pawn) and pawn.first:
+                    pawn.first = False
+            else:
+                if isinstance(pawn, Pawn):
+                    if vector in pawn.kill and type(self.board[field_to]) is not DPawn:
+                        self.board[field_to] = pawn
+                        self.board[field_from] = DPawn()
+                        if pawn.first:
+                            pawn.first = False
+                else:
+                    raise ValueError
+        except ValueError:
             return "Invalid move\n"
 
     def play(self, inp, whites):
@@ -193,9 +222,27 @@ class Chess(dict):
             return "Invalid choice\n"
 
     def start(self, inp="", interactive=False):
+        cols, rows = os.get_terminal_size()
+        if rows < 21 or cols < 34:
+            print("Terminal too small! For comfortable use it "
+                  f"should be at least {rows}/21 rows and {cols}/34 columns."
+                  "Exiting now...")
+            yield
         self.whites = True
         while interactive or (not interactive and inp):
             try:
+                cols, rows = os.get_terminal_size()
+                while rows < 21 or cols < 34:
+                    print("Terminal too small! For comfortable use it "
+                          f"should be at least {rows}/21 rows and "
+                          f"{cols}/34 columns."
+                          " Fix terminal height and width and type "
+                          "anything to continue... ")
+                    if interactive:
+                        inp = input("> ")
+                    else:
+                        yield
+                    cols, rows = os.get_terminal_size()
                 if self.whites:
                     reverse = False
                 else:
@@ -217,10 +264,6 @@ class Chess(dict):
                         yield "Blacks turn\n"
                 if interactive:
                     inp = input("> ")
-                if self.whites:
-                    self.whites = False
-                else:
-                    self.whites = True
                 if inp == "e":
                     raise EOFError
                 elif inp == "r":
@@ -232,6 +275,8 @@ class Chess(dict):
                             print(tmp, end="")
                         else:
                             yield tmp
+                    else:
+                        self.whites = not self.whites
             except EOFError:
                 sys.exit(0)
             except (ValueError, KeyboardInterrupt, IndexError):
@@ -242,5 +287,7 @@ class Chess(dict):
 
 if __name__ == "__main__":
     import argparse
+    if os.name != "nt":
+        import readline
     parser = argparse.ArgumentParser()
     Chess().start(interactive=True).send(None)
