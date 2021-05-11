@@ -1,105 +1,78 @@
 #!/usr/bin/env python3
 import os
-import sys
 import string
 
 alpha = tuple(string.ascii_uppercase[:8])
 
-# TODO
-# -diagonal movement
-# -functionality
-
 
 class DPawn():
     tag = " "
-    color_white = None
+    white = None
+
 
 class Pawn(DPawn):
     tag = "p"
-    color_white = True
-    movement = ((0, 1),)
+    white = True
+    movement = ((0, 1), )
     kill = ((-1, 1), (1, 1))
     first = True
 
 
 class BPawn(Pawn):
-    color_white = False
-    movement = ((0, -1),)
+    white = False
+    movement = ((0, -1), )
     kill = ((-1, -1), (1, -1))
 
 
 class Rook(DPawn):
     tag = "r"
-    color_white = True
+    white = True
     movement = []
-    def __init__(self):
-        for i in range(1,8):
-            self.movement.append((0,i))
-            self.movement.append((0,-i))
-            self.movement.append((i,0))
-            self.movement.append((-i,0))
-        self.movement = tuple(self.movement)
+
 
 class BRook(Rook):
-    color_white = False
+    white = False
 
 
 class Knight(DPawn):
     tag = "k"
-    color_white = True
+    white = True
     movement = ((1, 2), (1, -2), (-1, -2), (-1, 2),
-            (2, 1), (2, -1), (-2, -1), (-2, 1))
+                (2, 1), (2, -1), (-2, -1), (-2, 1))
 
 
 class BKnight(Knight):
-    color_white = False
+    white = False
 
 
 class Bishop(DPawn):
     tag = "b"
-    color_white = True
+    white = True
     movement = []
-    def __init__(self):
-        for i in range(1, 8):
-            self.movement.append((i, i))
-            self.movement.append((i, -i))
-            self.movement.append((-i, -i))
-            self.movement.append((-i, i))
-        self.movement = tuple(self.movement)
 
 
 class BBishop(Bishop):
-    color_white = False
+    white = False
 
 
 class Queen(DPawn):
     tag = "q"
-    color_white = True
-    movement = []
-    def __init__(self):
-        for i in range(1,8):
-            self.movement.append((0,i))
-            self.movement.append((0,-i))
-            self.movement.append((i,0))
-            self.movement.append((-i,0))
-            self.movement.append((i, i))
-            self.movement.append((i, -i))
-            self.movement.append((-i, -i))
-            self.movement.append((-i, i))
-        self.movement = tuple(self.movement)
+    white = True
+
 
 class BQueen(Queen):
-    color_white = False
+    white = False
 
 
 class King(DPawn):
     tag = "K"
-    color_white = True
+    white = True
     movement = ((1, 1), (1, -1), (-1, -1), (1, -1))
 
 
 class BKing(King):
-    color_white = False
+    white = False
+
 
 class ChessBoard(dict):
     def __init__(self):
@@ -145,17 +118,18 @@ class ChessBoard(dict):
         for i in range(*rng):
             yield "\n"+str(int(keys[i*8][1]))
             for j in range(*rngr):
-                if (i+j)%2:
+                if (i+j) % 2:
                     brgb = "255;255;255"
                 else:
                     brgb = "0;0;0"
                 piece = self[keys[j+i*8]]
-                if piece.color_white:
+                if piece.white:
                     frgb = "0;0;255"
                 else:
                     frgb = "255;0;0"
                 yield "".join((f"|\033[48;2;{brgb}m",
-                    f"\033[38;2;{frgb}m {self[keys[j+i*8]].tag} ","\033[m"))
+                               f"\033[38;2;{frgb}m {self[keys[j+i*8]].tag} ",
+                               "\033[m"))
             yield "|\n"+"-+"+"---+"*8
             yield "\033[|"
         yield "\n"
@@ -169,37 +143,109 @@ class Chess():
     def reset(self):
         self.board = ChessBoard()
 
+    def checkvh(self, from_coords, pawn, movement):
+        x, y = from_coords
+        if isinstance(pawn, (Queen, Rook)):
+            done = [False, False, False, False]
+            for i in range(1, 8):
+                if False not in done:
+                    break
+                if not done[0] and y + i <= 8 and\
+                        self.board[f"{alpha[x]}{y+i}"].white != self.whites:
+                    if type(self.board[f"{alpha[x]}{y+i}"]) is not DPawn:
+                        done[0] = True
+                    movement.add((0, i))
+                else:
+                    done[0] = True
+                if not done[1] and x + i < 8 and\
+                        self.board[f"{alpha[x+i]}{y}"].white != self.whites:
+                    if type(self.board[f"{alpha[x+i]}{y}"]) is not DPawn:
+                        done[1] = True
+                    movement.add((i, 0))
+                else:
+                    done[1] = True
+                if not done[2] and y - i > 0 and\
+                        self.board[f"{alpha[x]}{y-i}"].white != self.whites:
+                    if type(self.board[f"{alpha[x]}{y-i}"]) is not DPawn:
+                        done[2] = True
+                    movement.add((0, -i))
+                else:
+                    done[2] = True
+                if not done[3] and x + i >= 0 and\
+                        self.board[f"{alpha[x-i]}{y}"].white != self.whites:
+                    if type(self.board[f"{alpha[x-i]}{y}"]) is not DPawn:
+                        done[3] = True
+                    movement.add((-i, 0))
+                else:
+                    done[3] = True
+        if isinstance(pawn, (Queen, Bishop)):
+            done = [False, False, False, False]
+            for i in range(1, 8):
+                if False not in done:
+                    break
+                if not done[0] and y + i <= 8 and x + i < 8 and\
+                        self.board[f"{alpha[x+i]}{y+i}"].white != self.whites:
+                    breakpoint()
+                    if type(self.board[f"{alpha[x+i]}{y+i}"]) is not DPawn:
+                        done[0] = True
+                    movement.add((i, i))
+                else:
+                    done[0] = True
+                if not done[1] and y - i > 0 and x + i < 8 and\
+                        self.board[f"{alpha[x+i]}{y-i}"].white != self.whites:
+                    if type(self.board[f"{alpha[x+i]}{y-i}"]) is not DPawn:
+                        done[1] = True
+                    movement.add((i, -i))
+                else:
+                    done[1] = True
+                if not done[2] and y - i > 0 and x - i >= 0 and\
+                        self.board[f"{alpha[x-i]}{y-i}"].white != self.whites:
+                    if type(self.board[f"{alpha[x-i]}{y-i}"]) is not DPawn:
+                        done[2] = True
+                    movement.add((-i, -i))
+                else:
+                    done[2] = True
+                if not done[3] and y + i <= 8 and x - i >= 0 and\
+                        self.board[f"{alpha[x-i]}{y+i}"].white != self.whites:
+                    if type(self.board[f"{alpha[x-i]}{y+i}"]) is not DPawn:
+                        done[3] = True
+                    movement.add((-i, i))
+                else:
+                    done[3] = True
+        return movement
+
     def check(self, field_from, field_to):
         pawn = self.board[field_from]
-        if self.whites != pawn.color_white or type(pawn) is DPawn:
+        if self.whites != pawn.white or type(pawn) is DPawn or\
+                self.board[field_to].white == self.whites:
             return "Invalid move\n"
-        movement = set()
-        for i in pawn.movement:
-            movement.add(i)
         xfrom = alpha.index(field_from[0])
         xto = alpha.index(field_to[0])
         vector = (xto-xfrom, int(field_to[1])-int(field_from[1]))
+        from_coords = (xfrom, int(field_from[1]))
         try:
-            if isinstance(pawn, Pawn):
-                if pawn.first:
-                    if pawn.color_white:
-                        movement.add((0,2))
-                    else:
-                        movement.add((0,-2))
-            if vector in movement:
+            movement = set()
+            if isinstance(pawn, (Queen, Rook, Bishop)):
+                movement = self.checkvh(from_coords, pawn, movement)
+            else:
+                for i in pawn.movement:
+                    movement.add(i)
+                if isinstance(pawn, Pawn):
+                    if pawn.first:
+                        if pawn.white:
+                            movement.add((0, 2))
+                        else:
+                            movement.add((0, -2))
+
+            if vector in movement or (isinstance(pawn, Pawn) and vector
+                                      in pawn.kill and
+                                      type(self.board[field_to]) is not DPawn):
                 self.board[field_to] = pawn
                 self.board[field_from] = DPawn()
                 if isinstance(pawn, Pawn) and pawn.first:
                     pawn.first = False
             else:
-                if isinstance(pawn, Pawn):
-                    if vector in pawn.kill and type(self.board[field_to]) is not DPawn:
-                        self.board[field_to] = pawn
-                        self.board[field_from] = DPawn()
-                        if pawn.first:
-                            pawn.first = False
-                else:
-                    raise ValueError
+                raise ValueError
         except ValueError:
             return "Invalid move\n"
 
@@ -278,7 +324,7 @@ class Chess():
                     else:
                         self.whites = not self.whites
             except EOFError:
-                sys.exit(0)
+                break
             except (ValueError, KeyboardInterrupt, IndexError):
                 continue
             finally:
@@ -290,4 +336,7 @@ if __name__ == "__main__":
     if os.name != "nt":
         import readline
     parser = argparse.ArgumentParser()
-    Chess().start(interactive=True).send(None)
+    try:
+        Chess().start(interactive=True).send(None)
+    except StopIteration:
+        pass
