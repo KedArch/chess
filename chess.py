@@ -7,11 +7,13 @@ alpha = tuple(string.ascii_uppercase[:8])
 
 class DPawn():
     tag = " "
+    utag = tag
     white = None
 
 
 class Pawn(DPawn):
     tag = "p"
+    utag = "♟︎"
     white = True
     movement = ((0, 1), )
     kill = ((-1, 1), (1, 1))
@@ -26,6 +28,7 @@ class BPawn(Pawn):
 
 class Rook(DPawn):
     tag = "r"
+    utag = "♜"
     white = True
     movement = []
 
@@ -36,6 +39,7 @@ class BRook(Rook):
 
 class Knight(DPawn):
     tag = "k"
+    utag = "♞"
     white = True
     movement = ((1, 2), (1, -2), (-1, -2), (-1, 2),
                 (2, 1), (2, -1), (-2, -1), (-2, 1))
@@ -47,6 +51,7 @@ class BKnight(Knight):
 
 class Bishop(DPawn):
     tag = "b"
+    utag = "♝"
     white = True
     movement = []
 
@@ -57,6 +62,7 @@ class BBishop(Bishop):
 
 class Queen(DPawn):
     tag = "q"
+    utag = "♛"
     white = True
 
 
@@ -66,6 +72,7 @@ class BQueen(Queen):
 
 class King(DPawn):
     tag = "K"
+    utag = "♚"
     white = True
     movement = ((1, 1), (1, -1), (-1, -1), (1, -1))
 
@@ -104,12 +111,22 @@ class ChessBoard(dict):
                     self[i+str(j)] = BKing()
                 else:
                     self[i+str(j)] = DPawn()
+        self.white_outed = set()
+        self.black_outed = set()
+        self.last = ()
 
     def print(self, reverse=False):
         keys = list(self.keys())
+        clear = "\033[m"
+        whpawns = "\033[38;2;0;0;255m"
+        blpawns = "\033[38;2;255;0;0m"
+        whtile = "\033[48;2;255;255;255m"
+        bltile = "\033[48;2;0;0;0m"
+        ind = "\033[48;2;128;128;128m"
         yield " "
         rng = [7, -1, -1]
         rngr = [0, 8, 1]
+        last = self.last
         if reverse:
             rng, rngr = rngr, rng
         for i in range(*rngr):
@@ -119,20 +136,33 @@ class ChessBoard(dict):
             yield "\n"+str(int(keys[i*8][1]))
             for j in range(*rngr):
                 if (i+j) % 2:
-                    brgb = "255;255;255"
+                    bg = whtile
                 else:
-                    brgb = "0;0;0"
+                    bg = bltile
                 piece = self[keys[j+i*8]]
                 if piece.white:
-                    frgb = "0;0;255"
+                    fg = whpawns
                 else:
-                    frgb = "255;0;0"
-                yield "".join((f"|\033[48;2;{brgb}m",
-                               f"\033[38;2;{frgb}m {self[keys[j+i*8]].tag} ",
-                               "\033[m"))
+                    fg = blpawns
+                if j+i*8 in last:
+                    piece = f"{ind}{piece.utag}{bg}"
+                else:
+                    piece = piece.utag
+                yield "".join((f"|{bg}{fg} ",
+                               str(piece),
+                               f" {clear}"))
             yield "|\n"+"-+"+"---+"*8
-            yield "\033[|"
         yield "\n"
+        if self.white_outed:
+            yield f"{whpawns}Out:"
+            for i in self.white_outed:
+                yield f" {i.utag}"
+            yield f"{clear}\n"
+        if self.black_outed:
+            yield f"{blpawns}Out:"
+            for i in self.black_outed:
+                yield f" {i.utag}"
+            yield f"{clear}\n"
 
 
 class Chess():
@@ -142,6 +172,7 @@ class Chess():
 
     def reset(self):
         self.board = ChessBoard()
+        self.whites = True
 
     def checkvh(self, from_coords, pawn, movement):
         x, y = from_coords
@@ -240,8 +271,16 @@ class Chess():
             if vector in movement or (isinstance(pawn, Pawn) and vector
                                       in pawn.kill and
                                       type(self.board[field_to]) is not DPawn):
+                if self.whites and type(self.board[field_to]) is not DPawn:
+                    self.board.black_outed.add(self.board[field_to])
+                elif not self.whites and type(self.board[field_to])\
+                        is not DPawn:
+                    self.board.white_outed.add(self.board[field_to])
                 self.board[field_to] = pawn
                 self.board[field_from] = DPawn()
+                self.board.last = (
+                        alpha.index(field_from[0])+(int(field_from[1])-1)*8,
+                        alpha.index(field_to[0])+(int(field_to[1])-1)*8)
                 if isinstance(pawn, Pawn) and pawn.first:
                     pawn.first = False
             else:
@@ -251,7 +290,8 @@ class Chess():
 
     def play(self, inp, whites):
         try:
-            field_from, field_to = inp.split(" ", 1)
+            field_from = inp[:2].strip()
+            field_to = inp[2:].strip()
             if len(field_from) != 2 or len(field_to) != 2:
                 raise ValueError
             field_from = field_from.upper()
@@ -298,24 +338,14 @@ class Chess():
                         print(i, end="")
                     else:
                         yield i
-                if self.whites:
-                    if interactive:
-                        print("Whites turn")
-                    else:
-                        yield "Whites turn\n"
-                else:
-                    if interactive:
-                        print("Blacks turn")
-                    else:
-                        yield "Blacks turn\n"
                 if interactive:
                     inp = input("> ")
-                if inp == "e":
+                if inp == "q":
                     raise EOFError
                 elif inp == "r":
                     self.reset()
                 else:
-                    tmp = self.play(inp, self.whites)
+                    tmp = self.play(inp.strip(), self.whites)
                     if tmp:
                         if interactive:
                             print(tmp, end="")
