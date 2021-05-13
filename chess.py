@@ -216,7 +216,6 @@ class Chess():
                     break
                 if not done[0] and y + i <= 8 and x + i < 8 and\
                         self.board[f"{alpha[x+i]}{y+i}"].white != self.whites:
-                    breakpoint()
                     if type(self.board[f"{alpha[x+i]}{y+i}"]) is not DPawn:
                         done[0] = True
                     movement.add((i, i))
