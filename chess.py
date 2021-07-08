@@ -2,6 +2,11 @@
 import os
 import string
 
+#Todo:
+#-move history
+#-stalemate
+#-checkmate
+
 alpha = tuple(string.ascii_uppercase[:8])
 
 
@@ -266,7 +271,6 @@ class Chess():
                             movement.add((0, 2))
                         else:
                             movement.add((0, -2))
-
             if vector in movement or (isinstance(pawn, Pawn) and vector
                                       in pawn.kill and
                                       type(self.board[field_to]) is not DPawn):
