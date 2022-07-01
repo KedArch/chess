@@ -3,7 +3,7 @@ import os
 import string
 
 #Todo:
-#-move history
+#-move back from history
 #-stalemate
 #-checkmate
 
@@ -11,14 +11,14 @@ alpha = tuple(string.ascii_uppercase[:8])
 
 
 class DPawn():
-    tag = " "
-    utag = tag
+    atag = " "
+    tag = atag
     white = None
 
 
 class Pawn(DPawn):
-    tag = "p"
-    utag = "♟︎"
+    atag = "p"
+    tag = "♟︎"
     white = True
     movement = ((0, 1), )
     kill = ((-1, 1), (1, 1))
@@ -32,8 +32,8 @@ class BPawn(Pawn):
 
 
 class Rook(DPawn):
-    tag = "r"
-    utag = "♜"
+    atag = "r"
+    tag = "♜"
     white = True
     movement = []
 
@@ -43,8 +43,8 @@ class BRook(Rook):
 
 
 class Knight(DPawn):
-    tag = "k"
-    utag = "♞"
+    atag = "k"
+    tag = "♞"
     white = True
     movement = ((1, 2), (1, -2), (-1, -2), (-1, 2),
                 (2, 1), (2, -1), (-2, -1), (-2, 1))
@@ -55,8 +55,8 @@ class BKnight(Knight):
 
 
 class Bishop(DPawn):
-    tag = "b"
-    utag = "♝"
+    atag = "b"
+    tag = "♝"
     white = True
     movement = []
 
@@ -66,8 +66,8 @@ class BBishop(Bishop):
 
 
 class Queen(DPawn):
-    tag = "q"
-    utag = "♛"
+    atag = "q"
+    tag = "♛"
     white = True
 
 
@@ -76,8 +76,8 @@ class BQueen(Queen):
 
 
 class King(DPawn):
-    tag = "K"
-    utag = "♚"
+    atag = "K"
+    tag = "♚"
     white = True
     movement = ((1, 1), (1, -1), (-1, -1), (1, -1))
 
@@ -118,27 +118,31 @@ class ChessBoard(dict):
                     self[i+str(j)] = DPawn()
         self.white_outed = set()
         self.black_outed = set()
-        self.last = ()
+        self.history = []
 
     def print(self, reverse=False):
         keys = list(self.keys())
-        clear = "\033[m"
-        whpawns = "\033[38;2;0;0;255m"
-        blpawns = "\033[38;2;255;0;0m"
+        self.clear = "\033[m"
+        self.whpawns = "\033[38;2;0;0;255m"
+        self.blpawns = "\033[38;2;255;0;0m"
         whtile = "\033[48;2;255;255;255m"
         bltile = "\033[48;2;0;0;0m"
         ind = "\033[48;2;128;128;128m"
-        yield " "
+        text = " "
         rng = [7, -1, -1]
         rngr = [0, 8, 1]
-        last = self.last
+        last = (
+            alpha.index(self.history[-1][0][0])
+             +(int(self.history[-1][0][1])-1)*8,
+            alpha.index(self.history[-1][1][0])
+             +(int(self.history[-1][1][1])-1)*8) if self.history else (-1, -1)
         if reverse:
             rng, rngr = rngr, rng
         for i in range(*rngr):
-            yield f"| {keys[i][0]}".ljust(4)
-        yield "|\n"+"-+"+"---+"*8
+            print(f"| {keys[i][0]}".ljust(4), end="")
+        print("|\n"+"-+"+"---+"*8, end="")
         for i in range(*rng):
-            yield "\n"+str(int(keys[i*8][1]))
+            print("\n"+str(int(keys[i*8][1])), end="")
             for j in range(*rngr):
                 if (i+j) % 2:
                     bg = whtile
@@ -146,28 +150,37 @@ class ChessBoard(dict):
                     bg = bltile
                 piece = self[keys[j+i*8]]
                 if piece.white:
-                    fg = whpawns
+                    fg = self.whpawns
                 else:
-                    fg = blpawns
+                    fg = self.blpawns
                 if j+i*8 in last:
-                    piece = f"{ind}{piece.utag}{bg}"
+                    piece = f"{ind}{piece.tag}{bg}"
                 else:
-                    piece = piece.utag
-                yield "".join((f"|{bg}{fg} ",
-                               str(piece),
-                               f" {clear}"))
-            yield "|\n"+"-+"+"---+"*8
-        yield "\n"
+                    piece = piece.tag
+                print("".join((f"|{bg}{fg} ",
+                                 str(piece),
+                                 f" {self.clear}")), end="")
+            print("|\n"+"-+"+"---+"*8, end="")
+        print("\n", end="")
         if self.white_outed:
-            yield f"{whpawns}Out:"
+            print(f"{self.whpawns}Out:", end="")
             for i in self.white_outed:
-                yield f" {i.utag}"
-            yield f"{clear}\n"
+                print(f" {i.tag}", end="")
+            print(f"{self.clear}\n", end="")
         if self.black_outed:
-            yield f"{blpawns}Out:"
+            print(f"{self.blpawns}Out:", end="")
             for i in self.black_outed:
-                yield f" {i.utag}"
-            yield f"{clear}\n"
+                print(f" {i.tag}", end="")
+        print(self.clear)
+
+    def show_history(self):
+        for i in self.history:
+            x = f"{i[0]}({self.whpawns if i[2].white else self.blpawns}"\
+              +f"{i[2].tag}{self.clear}) => {i[1]}"
+            if i[3].tag != " ":
+                x += f"({self.whpawns if i[3].white else self.blpawns}"\
+                  +f"{i[3].tag}{self.clear})"
+            print(x)
 
 
 class Chess():
@@ -178,6 +191,14 @@ class Chess():
     def reset(self):
         self.board = ChessBoard()
         self.whites = True
+
+    def pawn_char(pchar):
+        Pawn.tag, Pawn.atag = Pawn.atag, Pawn.tag
+        Rook.tag, Rook.atag = Rook.atag, Rook.tag
+        Knight.tag, Knight.atag = Knight.atag, Knight.tag
+        Bishop.tag, Bishop.atag = Bishop.atag, Bishop.tag
+        Queen.tag, Queen.atag = Queen.atag, Queen.tag
+        King.tag, King.atag = King.atag, King.tag
 
     def checkvh(self, from_coords, pawn, movement):
         x, y = from_coords
@@ -279,11 +300,10 @@ class Chess():
                 elif not self.whites and type(self.board[field_to])\
                         is not DPawn:
                     self.board.white_outed.add(self.board[field_to])
-                self.board[field_to] = pawn
+                self.board.history.append(
+                    (field_from, field_to, self.board[field_from], self.board[field_to]))
                 self.board[field_from] = DPawn()
-                self.board.last = (
-                        alpha.index(field_from[0])+(int(field_from[1])-1)*8,
-                        alpha.index(field_to[0])+(int(field_to[1])-1)*8)
+                self.board[field_to] = pawn
                 if isinstance(pawn, Pawn) and pawn.first:
                     pawn.first = False
             else:
@@ -310,15 +330,29 @@ class Chess():
         except ValueError:
             return "Invalid choice\n"
 
-    def start(self, inp="", interactive=False):
+    def help(self):
+        print("Welcome to chess!\n"
+              +"To mitigate problems with some terminals\n"
+              +"white pawns are blue and black are red\n"
+              +"Help:\n"
+              +"? - this helhelp text\n"
+              +"a - change between ascii and unicode pawns\n"
+              +"h - show history\n"
+              +"r - reset board\n"
+              +"q - quit")
+
+    def start(self, ascii_pawns):
         cols, rows = os.get_terminal_size()
         if rows < 21 or cols < 34:
             print("Terminal too small! For comfortable use it "
                   f"should be at least {rows}/21 rows and {cols}/34 columns."
                   "Exiting now...")
-            yield
+            return
         self.whites = True
-        while interactive or (not interactive and inp):
+        if ascii_pawns:
+            self.pawn_char()
+        self.help()
+        while True:
             try:
                 cols, rows = os.get_terminal_size()
                 while rows < 21 or cols < 34:
@@ -327,41 +361,34 @@ class Chess():
                           f"{cols}/34 columns."
                           " Fix terminal height and width and type "
                           "anything to continue... ")
-                    if interactive:
-                        inp = input("> ")
-                    else:
-                        yield
+                    inp = input("> ")
                     cols, rows = os.get_terminal_size()
                 if self.whites:
                     reverse = False
                 else:
                     reverse = True
-                for i in self.board.print(reverse):
-                    if interactive:
-                        print(i, end="")
-                    else:
-                        yield i
-                if interactive:
-                    inp = input("> ")
+                self.board.print(reverse)
+                inp = input("> ")
                 if inp == "q":
                     raise EOFError
                 elif inp == "r":
                     self.reset()
+                elif inp == "h":
+                    self.board.show_history()
+                elif inp == "a":
+                    self.pawn_char()
+                elif inp == "?":
+                    self.help()
                 else:
                     tmp = self.play(inp.strip(), self.whites)
                     if tmp:
-                        if interactive:
-                            print(tmp, end="")
-                        else:
-                            yield tmp
+                        print(tmp, end="")
                     else:
                         self.whites = not self.whites
             except EOFError:
                 break
             except (ValueError, KeyboardInterrupt, IndexError):
                 continue
-            finally:
-                inp = ""
 
 
 if __name__ == "__main__":
@@ -369,7 +396,8 @@ if __name__ == "__main__":
     if os.name != "nt":
         import readline
     parser = argparse.ArgumentParser()
-    try:
-        Chess().start(interactive=True).send(None)
-    except StopIteration:
-        pass
+    parser.add_argument(
+            "-a", "--ascii", help="show ascii pawns instead of unicode ones",
+            default=False)
+    args = parser.parse_args()
+    Chess().start(args.ascii)
