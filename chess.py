@@ -3,7 +3,7 @@ import os
 import string
 
 #Todo:
-#-move back from history
+#-fix king,bishop,rook,queen movement
 #-stalemate
 #-checkmate
 
@@ -88,6 +88,13 @@ class BKing(King):
 
 class ChessBoard(dict):
     def __init__(self):
+        self.start_positions()
+        self.white_outed = set()
+        self.black_outed = set()
+        self.history = []
+        self.history_ind = 0
+
+    def start_positions(self):
         for j in range(1, 9):
             for ind, i in enumerate(alpha):
                 if j == 2:
@@ -116,9 +123,6 @@ class ChessBoard(dict):
                     self[i+str(j)] = BKing()
                 else:
                     self[i+str(j)] = DPawn()
-        self.white_outed = set()
-        self.black_outed = set()
-        self.history = []
 
     def print(self, reverse=False):
         keys = list(self.keys())
@@ -128,16 +132,22 @@ class ChessBoard(dict):
         whtile = "\033[48;2;255;255;255m"
         bltile = "\033[48;2;0;0;0m"
         ind = "\033[48;2;128;128;128m"
-        text = " "
         rng = [7, -1, -1]
         rngr = [0, 8, 1]
         last = (
-            alpha.index(self.history[-1][0][0])
-             +(int(self.history[-1][0][1])-1)*8,
-            alpha.index(self.history[-1][1][0])
-             +(int(self.history[-1][1][1])-1)*8) if self.history else (-1, -1)
+            alpha.index(self.history[max(-len(self.history),
+                                         -1-self.history_ind)][0][0])
+             +(int(self.history[max(-len(self.history),
+                                    -1-self.history_ind)][0][1])-1)*8,
+            alpha.index(self.history[max(-len(self.history),
+                                         -1-self.history_ind)][1][0])
+             +(int(self.history[max(-len(self.history),
+                                    -1-self.history_ind)][1][1])-1)*8)\
+            if self.history and self.history_ind < len(self.history)\
+            else (-1, -1)
         if reverse:
             rng, rngr = rngr, rng
+        print(" ", end="")
         for i in range(*rngr):
             print(f"| {keys[i][0]}".ljust(4), end="")
         print("|\n"+"-+"+"---+"*8, end="")
@@ -161,7 +171,7 @@ class ChessBoard(dict):
                                  str(piece),
                                  f" {self.clear}")), end="")
             print("|\n"+"-+"+"---+"*8, end="")
-        print("\n", end="")
+        print()
         if self.white_outed:
             print(f"{self.whpawns}Out:", end="")
             for i in self.white_outed:
@@ -174,7 +184,12 @@ class ChessBoard(dict):
         print(self.clear)
 
     def show_history(self):
-        for i in self.history:
+        if not self.history:
+            print("No recorded moves")
+            return
+        for ind, i in enumerate(self.history):
+            if ind >= len(self.history) - self.history_ind:
+                break
             x = f"{i[0]}({self.whpawns if i[2].white else self.blpawns}"\
               +f"{i[2].tag}{self.clear}) => {i[1]}"
             if i[3].tag != " ":
@@ -192,13 +207,50 @@ class Chess():
         self.board = ChessBoard()
         self.whites = True
 
-    def pawn_char(pchar):
+    def pawn_char(self):
         Pawn.tag, Pawn.atag = Pawn.atag, Pawn.tag
         Rook.tag, Rook.atag = Rook.atag, Rook.tag
         Knight.tag, Knight.atag = Knight.atag, Knight.tag
         Bishop.tag, Bishop.atag = Bishop.atag, Bishop.tag
         Queen.tag, Queen.atag = Queen.atag, Queen.tag
         King.tag, King.atag = King.atag, King.tag
+
+    def move_history(self, forward=False):
+        if forward:
+            if self.board.history_ind == 0:
+                print("Already on last move")
+            else:
+                self.board.history_ind -= 1
+                self.whites = not self.whites
+        else:
+            if self.board.history_ind == len(self.board.history):
+                print("Already went back to start")
+            else:
+                self.board.history_ind += 1
+                self.whites = not self.whites
+        self.sync_history()
+
+    def sync_history(self, reset=False):
+        if reset and self.board.history_ind:
+            self.board.history = self.board.history[:-self.board.history_ind]
+            self.board.history_ind = 0
+            return
+        self.board.start_positions()
+        for i in range(len(self.board.history)):
+            if type(self.board.history[i][3]) is not DPawn:
+                if i < len(self.board.history) - self.board.history_ind:
+                    if self.board.history[i][3].white:
+                        self.board.white_outed.add(self.board.history[i][3])
+                    else:
+                        self.board.black_outed.add(self.board.history[i][3])
+                else:
+                    if self.board.history[i][3] in self.board.white_outed:
+                        self.board.white_outed.remove(self.board.history[i][3])
+                    elif self.board.history[i][3] in self.board.black_outed:
+                        self.board.black_outed.remove(self.board.history[i][3])
+            if i < len(self.board.history) - self.board.history_ind:
+                self.board[self.board.history[i][0]] = DPawn
+                self.board[self.board.history[i][1]] = self.board.history[i][2]
 
     def checkvh(self, from_coords, pawn, movement):
         x, y = from_coords
@@ -295,6 +347,7 @@ class Chess():
             if vector in movement or (isinstance(pawn, Pawn) and vector
                                       in pawn.kill and
                                       type(self.board[field_to]) is not DPawn):
+                self.sync_history(True)
                 if self.whites and type(self.board[field_to]) is not DPawn:
                     self.board.black_outed.add(self.board[field_to])
                 elif not self.whites and type(self.board[field_to])\
@@ -337,6 +390,8 @@ class Chess():
               +"Help:\n"
               +"? - this helhelp text\n"
               +"a - change between ascii and unicode pawns\n"
+              +"hb - go back to previous move\n"
+              +"hf - redo move if went back and did not make any move\n"
               +"h - show history\n"
               +"r - reset board\n"
               +"q - quit")
@@ -375,6 +430,10 @@ class Chess():
                     self.reset()
                 elif inp == "h":
                     self.board.show_history()
+                elif inp == "hf":
+                    self.move_history(True)
+                elif inp == "hb":
+                    self.move_history()
                 elif inp == "a":
                     self.pawn_char()
                 elif inp == "?":
@@ -398,6 +457,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
             "-a", "--ascii", help="show ascii pawns instead of unicode ones",
-            default=False)
+            default=False, action="store_true")
     args = parser.parse_args()
     Chess().start(args.ascii)
