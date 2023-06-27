@@ -2,11 +2,6 @@
 import os
 import string
 
-#Todo:
-#-fix king,bishop,rook,queen movement
-#-stalemate
-#-checkmate
-
 alpha = tuple(string.ascii_uppercase[:8])
 
 
