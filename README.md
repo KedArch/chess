@@ -16,7 +16,7 @@ Chess implementation I tried to do some time ago. Might return to finish it some
 ## Technical limitations
 
 - can only play on 21x34 terminal or larger
-- colors and unicode characters were checked only on Linux with readline
+- colors may not work in Windows
 
 ## Known bugs
 
